@@ -1,35 +1,33 @@
-
 class Triangle:
 
-    def __init__(self, symbol=None, children=None):
-        self.symbol = symbol
-        self.children = children
+    def __init__(self, symbols, positions):
+        self.symbols = symbols
+        self.positions = positions
 
     @classmethod
-    def build(cls, segment):
-        if segment == segment[0] * len(segment):
-            return cls(symbol=segment[0])
-        part = len(segment) // 4
-        children = [
-            cls.build(segment[start:start + part])
-            for start in range(0, len(segment), part)
-        ]
-        head = children[0]
-        if head.is_leaf and all(
-            child.is_leaf and child.symbol == head.symbol
-            for child in children
-        ):
-            return cls(symbol=head.symbol)
-        return cls(children=children)
+    def from_reordered(cls, reordered_text, positions):
+        return cls(list(reordered_text), list(positions))
 
-    @property
-    def is_leaf(self):
-        return self.children is None
+    def compress(self):
+        while len(self.symbols) >= 4 and self._every_block_is_can_compress():
+            self.symbols = [block[0] for block in self._blocks(self.symbols)]
+            self.positions = [
+                min(block) for block in self._blocks(self.positions)
+            ]
+
+    def _every_block_is_can_compress(self):
+        return all(
+            block == [block[0]] * 4 for block in self._blocks(self.symbols)
+        )
+
+    @staticmethod
+    def _blocks(items):
+        return [items[start:start + 4] for start in range(0, len(items), 4)]
 
     def __str__(self):
-        if self.is_leaf:
-            return self.symbol
-        return "".join(str(child) for child in self.children)
+        # Символы расставляются обратно по их позициям во входной строке.
+        ordered = sorted(zip(self.positions, self.symbols))
+        return "".join(symbol for _, symbol in ordered)
 
 
 class Reorder:
@@ -37,31 +35,29 @@ class Reorder:
     def __init__(self, level):
         self.side = 2 ** level
 
-    def reorder(self, text):
-        source_positions = self.collect_possitions(self.all_cells_with_positions(),
-                                          self.side)
-        return "".join(text[position] for position in source_positions)
+    def positions_in_subtriangle_order(self):
+        return self.collect_positions(self.all_cells_with_start_positions(), self.side)
 
-    def all_cells_with_positions(self):
+    def all_cells_with_start_positions(self):
         cells = []
         position = 0
         for row in range(self.side):
-            for column in range(2 * (self.side - 1 - row), -1, -1): #self.side -1  тк отсчет с нуля
+            for column in range(2 * (self.side - 1 - row), -1, -1):
                 cells.append((row, column, position))
                 position += 1
         return cells
 
-    def collect_possitions(self, cells, side):
+    def collect_positions(self, cells, side):
         # проход через треугольники в следующем порядке: нижний правый, перевернутый, нижний левый, верхний
         if len(cells) == 1:
             return [cells[0][2]]
         bottom_right, center, bottom_left, top = self.normalize_coordinate(cells, side)
         half = side // 2
         return (
-            self.collect_possitions(bottom_right, half)
-            + self.collect_possitions(center, half)
-            + self.collect_possitions(bottom_left, half)
-            + self.collect_possitions(top, half)
+            self.collect_positions(bottom_right, half)
+            + self.collect_positions(center, half)
+            + self.collect_positions(bottom_left, half)
+            + self.collect_positions(top, half)
         )
 
     @classmethod
@@ -99,12 +95,12 @@ def calc_level_recurs(length):
 with open("input.txt", encoding="utf-8") as source:
     text = source.read().strip()
 
-level_recurs = calc_level_recurs(len(text))
-reorder = Reorder(level_recurs)
-reorder_text = reorder.reorder(text) # Для удобства взаимодействия с текстом, поменяем порядок символов на тот, с которым мы будем взаимодействовать напрямую
-answer_text = Triangle.build(reorder_text)
+reorder = Reorder(calc_level_recurs(len(text)))
+positions = reorder.positions_in_subtriangle_order()
+reordered_text = "".join(text[position] for position in positions)
+
+triangle = Triangle.from_reordered(reordered_text, positions)
+triangle.compress()
 
 with open("output.txt", "w", encoding="utf-8") as output:
-    output.write(str(answer_text))
-
-
+    output.write(str(triangle))
