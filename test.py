@@ -97,7 +97,7 @@ with open("input.txt", encoding="utf-8") as source:
 
 reorder = Reorder(calc_level_recurs(len(text)))
 positions = reorder.positions_in_subtriangle_order()
-reordered_text = "".join(text[position] for position in positions)
+reordered_text = "".join(text[position] for position in positions) # преобразуем исходную строку в тот порядок символов, с которым будем взаимодействовать
 
 triangle = Triangle.from_reordered(reordered_text, positions)
 triangle.compress()
